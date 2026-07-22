@@ -4,9 +4,11 @@ from django.utils import timezone
 from django.core.exceptions import ValidationError
 from django.conf import settings
 
+
 class User(AbstractUser):
     is_provider = models.BooleanField(default=False)
     phone_number = models.CharField(max_length=15, blank=True, null=True)
+
 
 class Category(models.Model):
     name = models.CharField(max_length=200)
@@ -18,6 +20,7 @@ class Category(models.Model):
     def __str__(self):
         return self.name
 
+
 class Service(models.Model):
     name = models.CharField(max_length=200)
     description = models.TextField()
@@ -25,6 +28,7 @@ class Service(models.Model):
     # Используем settings.AUTH_USER_MODEL
     provider = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name='services')
     category = models.ForeignKey(Category, on_delete=models.CASCADE, related_name='services')
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def clean(self):
         if self.price <= 0:
@@ -32,6 +36,7 @@ class Service(models.Model):
 
     def __str__(self):
         return self.name
+
 
 class Booking(models.Model):
     STATUS_CHOICES = [
