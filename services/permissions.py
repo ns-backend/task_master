@@ -6,7 +6,7 @@ class IsProviderOrReadOnly(permissions.BasePermission):
     Редактирование — только владельцу (provider).
     Просмотр — всем (SAFE_METHODS).
     """
-
+    
     def has_permission(self, request, view):
         # Читать (GET, HEAD, OPTIONS) могут все
         if request.method in permissions.SAFE_METHODS:
@@ -20,5 +20,5 @@ class IsProviderOrReadOnly(permissions.BasePermission):
             return True
         
         # Редактировать или удалять может только сам автор услуги
-        # В твоей модели поле называется 'provider'
+        # В твоем ServiceViewSet автор хранится в поле provider
         return obj.provider == request.user

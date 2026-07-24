@@ -1,6 +1,7 @@
-from rest_framework import serializers
-from .models import User, Category, Service, Booking
 from django.utils import timezone
+from rest_framework import serializers
+
+from .models import User, Category, Service, Booking
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -15,51 +16,42 @@ class CategorySerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'slug']
 
 
-# Этот для создания и редактирования (принимает ID категории)
 class ServiceWriteSerializer(serializers.ModelSerializer):
+    """Сериализатор для создания и редактирования услуг."""
     class Meta:
         model = Service
         fields = ['id', 'name', 'description', 'price', 'category']
 
-    def validate_price(self, value): # Перенесли сюда
+    def validate_price(self, value):
         if value <= 0:
             raise serializers.ValidationError("Цена должна быть больше нуля.")
         return value
 
 
-# Этот для отображения (показывает детали категории)
 class ServiceReadSerializer(serializers.ModelSerializer):
-    # Вкладываем сериализатор категории внутрь
+    """Сериализатор для подробного отображения услуг."""
     category = CategorySerializer(read_only=True)
     provider = UserSerializer(read_only=True)
 
     class Meta:
         model = Service
-        fields = ['id', 'name', 'description', 'price', 'provider', 'category', 'created_at']
-
-
-# class ServiceSerializer(serializers.ModelSerializer):
-#     # Чтобы в API мы видели имя категории, а не ID
-#     category_name = serializers.ReadOnlyField(source='category.name')
-#     # Делаем provider только для чтения, будем назначать его в view.py автоматически
-#     provider = serializers.ReadOnlyField(source='provider.username')
-
-#     class Meta:
-#         model = Service
-#         fields = ['id', 'name', 'description', 'price', 'provider', 'category', 'category_name']
-
-#     def validate_price(self, value):
-#         if value <= 0:
-#             raise serializers.ValidationError("Цена должна быть больше нуля.")
-#         return value
+        fields = [
+            'id', 'name', 'description', 'price', 
+            'provider', 'category', 'created_at'
+        ]
 
 
 class BookingSerializer(serializers.ModelSerializer):
+    """Сериализатор для работы с бронированиями."""
     client = serializers.ReadOnlyField(source='client.username')
 
     class Meta:
         model = Booking
-        fields = ['id', 'client', 'service', 'booking_date', 'status', 'created_at']
+        fields = [
+            'id', 'client', 'service', 'booking_date', 
+            'status', 'created_at'
+        ]
+        read_only_fields = ['status'] # Статус меняется только через отдельные действия
 
     def validate_booking_date(self, value):
         if value < timezone.now():
