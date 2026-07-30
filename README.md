@@ -29,7 +29,7 @@
 
 ### 1. Клонирование репозитория
 ```bash
-git clone https://github.com/vash-akkount/task-master.git
+https://github.com/ns-backend/task_master.git
 cd task-master
 ```
 
