@@ -1,14 +1,18 @@
 from django_filters.rest_framework import DjangoFilterBackend
-from rest_framework import filters, viewsets
+from rest_framework import filters, mixins, permissions, status, viewsets
+from rest_framework.decorators import action
+from rest_framework.response import Response
 
 from .models import Booking, Category, Service, User
-from .permissions import IsProviderOrReadOnly
+from .permissions import IsAdminOrReadOnly, IsProviderOrReadOnly
 from .serializers import (
-    BookingSerializer, 
-    CategorySerializer, 
-    ServiceReadSerializer, 
-    ServiceWriteSerializer, 
-    UserSerializer
+    BookingSerializer,
+    CategorySerializer,
+    ServiceReadSerializer,
+    ServiceWriteSerializer,
+    UserReadSerializer,
+    UserRegistrationSerializer,
+    UserUpdateSerializer,
 )
 
 
@@ -45,8 +49,10 @@ class CategoryViewSet(viewsets.ModelViewSet):
     """
     Справочник категорий услуг.
     """
+
     queryset = Category.objects.all()
     serializer_class = CategorySerializer
+    permission_classes = [IsAdminOrReadOnly]
 
 
 class BookingViewSet(viewsets.ModelViewSet):
@@ -68,9 +74,53 @@ class BookingViewSet(viewsets.ModelViewSet):
         serializer.save(client=self.request.user)
 
 
-class UserViewSet(viewsets.ModelViewSet):
+class UserViewSet(
+    mixins.CreateModelMixin,
+    viewsets.GenericViewSet,
+):
     """
-    Управление профилями пользователей.
+    Регистрация пользователя и управление собственным профилем.
     """
+
     queryset = User.objects.all()
-    serializer_class = UserSerializer
+
+    def get_permissions(self):
+        if self.action == 'create':
+            return [permissions.AllowAny()]
+
+        return [permissions.IsAuthenticated()]
+
+    def get_serializer_class(self):
+        if self.action == 'create':
+            return UserRegistrationSerializer
+
+        if self.action == 'me' and self.request.method == 'PATCH':
+            return UserUpdateSerializer
+
+        return UserReadSerializer
+
+    @action(
+        detail=False,
+        methods=['get', 'patch'],
+        url_path='me',
+    )
+    def me(self, request):
+        user = request.user
+
+        if request.method == 'GET':
+            serializer = UserReadSerializer(user)
+            return Response(serializer.data)
+
+        serializer = UserUpdateSerializer(
+            user,
+            data=request.data,
+            partial=True,
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+
+        response_serializer = UserReadSerializer(user)
+        return Response(
+            response_serializer.data,
+            status=status.HTTP_200_OK,
+        )

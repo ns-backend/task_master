@@ -22,3 +22,16 @@ class IsProviderOrReadOnly(permissions.BasePermission):
         # Редактировать или удалять может только сам автор услуги
         # В твоем ServiceViewSet автор хранится в поле provider
         return obj.provider == request.user
+
+
+class IsAdminOrReadOnly(permissions.BasePermission):
+    """
+    Читать объект может любой пользователь.
+    Создавать, изменять и удалять может только администратор.
+    """
+
+    def has_permission(self, request, view):
+        if request.method in permissions.SAFE_METHODS:
+            return True
+
+        return request.user.is_authenticated and request.user.is_staff

@@ -4,10 +4,54 @@ from rest_framework import serializers
 from .models import User, Category, Service, Booking
 
 
-class UserSerializer(serializers.ModelSerializer):
+class UserReadSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
-        fields = ['id', 'username', 'email', 'is_provider', 'phone_number']
+        fields = [
+            'id',
+            'username',
+            'email',
+            'is_provider',
+            'phone_number',
+        ]
+        read_only_fields = [
+            'id',
+            'username',
+            'email',
+            'is_provider',
+            'phone_number',
+        ]
+
+
+class UserRegistrationSerializer(serializers.ModelSerializer):
+    password = serializers.CharField(
+        write_only=True,
+        min_length=8,
+    )
+
+    class Meta:
+        model = User
+        fields = [
+            'id',
+            'username',
+            'email',
+            'password',
+            'is_provider',
+            'phone_number',
+        ]
+        read_only_fields = ['id']
+
+    def create(self, validated_data):
+        return User.objects.create_user(**validated_data)
+
+
+class UserUpdateSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            'email',
+            'phone_number',
+        ]
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -31,7 +75,7 @@ class ServiceWriteSerializer(serializers.ModelSerializer):
 class ServiceReadSerializer(serializers.ModelSerializer):
     """Сериализатор для подробного отображения услуг."""
     category = CategorySerializer(read_only=True)
-    provider = UserSerializer(read_only=True)
+    provider = UserReadSerializer(read_only=True)
 
     class Meta:
         model = Service
