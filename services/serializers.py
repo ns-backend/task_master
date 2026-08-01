@@ -95,9 +95,33 @@ class BookingSerializer(serializers.ModelSerializer):
             'id', 'client', 'service', 'booking_date', 
             'status', 'created_at'
         ]
-        read_only_fields = ['status'] # Статус меняется только через отдельные действия
+        read_only_fields = ['status', 'client'] # Статус меняется только через отдельные действия
 
     def validate_booking_date(self, value):
-        if value < timezone.now():
-            raise serializers.ValidationError("Нельзя забронировать на прошлое время.")
+        if value <= timezone.now():
+            raise serializers.ValidationError(
+                'Дата бронирования должна быть в будущем.'
+            )
+
         return value
+
+    def validate(self, attrs):
+        request = self.context.get('request')
+        service = attrs.get('service')
+
+        if request is None:
+            return attrs
+
+        user = request.user
+
+        if service and service.provider_id == user.id:
+            raise serializers.ValidationError(
+                'Нельзя забронировать собственную услугу.'
+            )
+
+        if user.is_provider:
+            raise serializers.ValidationError(
+                'Провайдер не может создавать бронирования.'
+            )
+
+        return attrs

@@ -55,23 +55,111 @@ class CategoryViewSet(viewsets.ModelViewSet):
     permission_classes = [IsAdminOrReadOnly]
 
 
-class BookingViewSet(viewsets.ModelViewSet):
-    """
-    Система бронирования услуг.
-    """
+class BookingViewSet(
+    mixins.CreateModelMixin,
+    mixins.ListModelMixin,
+    mixins.RetrieveModelMixin,
+    viewsets.GenericViewSet,
+):
     serializer_class = BookingSerializer
+    permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
-        # select_related ускоряет работу, подгружая связанные данные сразу
-        base_queryset = Booking.objects.select_related('client', 'service', 'service__provider')
-        
+
+        queryset = Booking.objects.select_related(
+            'client',
+            'service',
+            'service__provider',
+        )
+
         if user.is_provider:
-            return base_queryset.filter(service__provider=user)
-        return base_queryset.filter(client=user)
+            return queryset.filter(service__provider=user)
+
+        return queryset.filter(client=user)
 
     def perform_create(self, serializer):
         serializer.save(client=self.request.user)
+
+    @action(
+        detail=True,
+        methods=['post'],
+    )
+    def confirm(self, request, pk=None):
+        booking = self.get_object()
+
+        if booking.service.provider != request.user:
+            return Response(
+                {'detail': 'Подтвердить бронирование может только провайдер услуги.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if booking.status != 'pending':
+            return Response(
+                {'detail': 'Подтвердить можно только ожидающее бронирование.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        booking.status = 'confirmed'
+        booking.save(update_fields=['status'])
+
+        serializer = self.get_serializer(booking)
+        return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=['post'],
+    )
+    def complete(self, request, pk=None):
+        booking = self.get_object()
+
+        if booking.service.provider != request.user:
+            return Response(
+                {'detail': 'Завершить бронирование может только провайдер услуги.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        if booking.status != 'confirmed':
+            return Response(
+                {'detail': 'Завершить можно только подтверждённое бронирование.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        booking.status = 'completed'
+        booking.save(update_fields=['status'])
+
+        serializer = self.get_serializer(booking)
+        return Response(serializer.data)
+
+    @action(
+        detail=True,
+        methods=['post'],
+    )
+    def cancel(self, request, pk=None):
+        booking = self.get_object()
+
+        if booking.client != request.user:
+            return Response(
+                {'detail': 'Отменить бронирование может только клиент.'},
+                status=status.HTTP_403_FORBIDDEN,
+            )
+
+        allowed_statuses = [
+            'pending',
+            'confirmed',
+        ]
+
+        if booking.status not in allowed_statuses:
+            return Response(
+                {'detail': 'Это бронирование уже нельзя отменить.'},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        booking.status = 'canceled'
+        booking.save(update_fields=['status'])
+
+        serializer = self.get_serializer(booking)
+        return Response(serializer.data)
 
 
 class UserViewSet(
