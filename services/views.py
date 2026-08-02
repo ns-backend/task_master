@@ -50,7 +50,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     Справочник категорий услуг.
     """
 
-    queryset = Category.objects.all()
+    queryset = Category.objects.all().order_by('id')
     serializer_class = CategorySerializer
     permission_classes = [IsAdminOrReadOnly]
 
