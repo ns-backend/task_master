@@ -97,3 +97,42 @@ def booking(db, client_user, service, future_booking_date):
         service=service,
         booking_date=future_booking_date,
     )
+
+
+@pytest.fixture
+def another_client(db):
+    return User.objects.create_user(
+        username='another_client',
+        email='another-client@example.com',
+        password='strong-password-123',
+        is_provider=False,
+        phone_number='+49666666666',
+    )
+
+
+@pytest.fixture
+def another_client_booking(
+    db,
+    another_client,
+    service,
+    future_booking_date,
+):
+    return Booking.objects.create(
+        client=another_client,
+        service=service,
+        booking_date=future_booking_date,
+    )
+
+
+@pytest.fixture
+def another_provider_booking(
+    db,
+    client_user,
+    another_service,
+    future_booking_date,
+):
+    return Booking.objects.create(
+        client=client_user,
+        service=another_service,
+        booking_date=future_booking_date,
+    )
