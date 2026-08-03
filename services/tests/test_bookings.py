@@ -381,3 +381,138 @@ def test_client_can_cancel_pending_booking(
 
     assert booking.status == 'canceled'
     assert response.data['status'] == 'canceled'
+
+
+def test_client_can_cancel_confirmed_booking(
+    api_client,
+    client_user,
+    booking,
+):
+    booking.status = 'confirmed'
+    booking.save(update_fields=['status'])
+
+    api_client.force_authenticate(user=client_user)
+
+    response = api_client.post(
+        f'/api/bookings/{booking.id}/cancel/',
+        {},
+        format='json',
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    booking.refresh_from_db()
+
+    assert booking.status == 'canceled'
+
+
+def test_completed_booking_cannot_be_canceled(
+    api_client,
+    client_user,
+    booking,
+):
+    booking.status = 'completed'
+    booking.save(update_fields=['status'])
+
+    api_client.force_authenticate(user=client_user)
+
+    response = api_client.post(
+        f'/api/bookings/{booking.id}/cancel/',
+        {},
+        format='json',
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    booking.refresh_from_db()
+
+    assert booking.status == 'completed'
+
+
+def test_canceled_booking_cannot_be_canceled_again(
+    api_client,
+    client_user,
+    booking,
+):
+    booking.status = 'canceled'
+    booking.save(update_fields=['status'])
+
+    api_client.force_authenticate(user=client_user)
+
+    response = api_client.post(
+        f'/api/bookings/{booking.id}/cancel/',
+        {},
+        format='json',
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    booking.refresh_from_db()
+
+    assert booking.status == 'canceled'
+
+
+def test_provider_cannot_cancel_booking(
+    api_client,
+    provider_user,
+    booking,
+):
+    api_client.force_authenticate(user=provider_user)
+
+    response = api_client.post(
+        f'/api/bookings/{booking.id}/cancel/',
+        {},
+        format='json',
+    )
+
+    assert response.status_code == status.HTTP_403_FORBIDDEN
+
+    booking.refresh_from_db()
+
+    assert booking.status == 'pending'
+
+
+def test_canceled_booking_cannot_be_confirmed(
+    api_client,
+    provider_user,
+    booking,
+):
+    booking.status = 'canceled'
+    booking.save(update_fields=['status'])
+
+    api_client.force_authenticate(user=provider_user)
+
+    response = api_client.post(
+        f'/api/bookings/{booking.id}/confirm/',
+        {},
+        format='json',
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    booking.refresh_from_db()
+
+    assert booking.status == 'canceled'
+
+
+def test_completed_booking_cannot_be_confirmed(
+    api_client,
+    provider_user,
+    booking,
+):
+    booking.status = 'completed'
+    booking.save(update_fields=['status'])
+
+    api_client.force_authenticate(user=provider_user)
+
+    response = api_client.post(
+        f'/api/bookings/{booking.id}/confirm/',
+        {},
+        format='json',
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    booking.refresh_from_db()
+
+    assert booking.status == 'completed'
