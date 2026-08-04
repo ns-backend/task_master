@@ -130,30 +130,25 @@ http://localhost:8000/api/schema/
 ```
 
 
-## Тесты
+## Проверка проекта
 
-Запуск всех тестов внутри контейнера:
+Перед коммитом рекомендуется выполнить следующие команды:
 
 ```bash
+# Проверка конфигурации Django
+docker compose exec web python manage.py check
+
+# Проверка отсутствия несозданных миграций
+docker compose exec web python manage.py makemigrations --check --dry-run
+
+# Запуск тестов
 docker compose exec web pytest
 ```
 
-Подробный вывод:
+Для получения подробного вывода тестов:
 
 ```bash
 docker compose exec web pytest -v
-```
-
-Проверка Django:
-
-```bash
-docker compose exec web python manage.py check
-```
-
-Проверка отсутствующих миграций:
-
-```bash
-docker compose exec web python manage.py makemigrations --check --dry-run
 ```
 
 
@@ -225,7 +220,7 @@ task_master/
 ├── manage.py
 ├── pytest.ini
 └── requirements.txt
-
+```
 
 ## Планы развития
 
@@ -235,4 +230,3 @@ task_master/
 - раздельные development и production settings;
 - production-развёртывание;
 - дополнительные ограничения доступности времени бронирования.
-```
