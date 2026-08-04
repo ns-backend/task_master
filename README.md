@@ -76,61 +76,80 @@ RESTful API для маркетплейса услуг, разработанны
 
 ## Запуск через Docker
 
-1. Клонирование репозитория
+1. **Клонирование репозитория**
 
+```bash
 git clone https://github.com/ns-backend/task_master.git
 cd task_master
+```
 
-2. Создание файла окружения
+2. **Создание файла окружения**
 
+```bash
 cp .env.example .env
+```
 
 Для PowerShell:
 
+```powershell
 Copy-Item .env.example .env
+```
 
-3. Сборка и запуск контейнеров
+3. **Сборка и запуск контейнеров**
 
+```bash
 docker compose build
 docker compose up -d
+```
 
-4. Применение миграций
+4. **Применение миграций**
 
+```bash
 docker compose exec web python manage.py migrate
+```
 
-5. Создание администратора
+5. **Создание администратора**
 
+```bash
 docker compose exec web python manage.py createsuperuser
+```
 
 
 ## Документация API
 
 После запуска проекта Swagger UI доступен по адресу:
 
+```text
 http://localhost:8000/api/docs/
+```
 
 OpenAPI-схема:
 
+```text
 http://localhost:8000/api/schema/
+```
 
 
-## Тесты
+## Проверка проекта
 
-Запуск всех тестов внутри контейнера:
+Перед коммитом рекомендуется выполнить следующие команды:
 
-docker compose exec web pytest
-
-Подробный вывод:
-
-docker compose exec web pytest -v
-
-Проверка Django:
-
+```bash
+# Проверка конфигурации Django
 docker compose exec web python manage.py check
 
-Проверка отсутствующих миграций:
-
+# Проверка отсутствия несозданных миграций
 docker compose exec web python manage.py makemigrations --check --dry-run
+
+# Запуск тестов
+docker compose exec web pytest
+```
+
+Для получения подробного вывода тестов:
+
+```bash
+docker compose exec web pytest -v
+```
 
 
 ## Continuous Integration
@@ -177,7 +196,9 @@ GitHub Actions автоматически запускает при push и pull
 
 Для Docker:
 
+```env
 DB_HOST=db
+```
 
 
 ## Структура проекта
@@ -199,7 +220,7 @@ task_master/
 ├── manage.py
 ├── pytest.ini
 └── requirements.txt
-
+```
 
 ## Планы развития
 
