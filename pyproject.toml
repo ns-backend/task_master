@@ -1,0 +1,33 @@
+[tool.ruff]
+target-version = "py312"
+line-length = 88
+extend-exclude = [
+    ".git",
+    ".venv",
+    ".pytest_cache",
+    "services/migrations",
+]
+
+[tool.ruff.lint]
+select = [
+    "E",
+    "F",
+    "I",
+    "B",
+    "UP",
+]
+ignore = [
+    "E501",
+]
+
+[tool.ruff.lint.isort]
+known-first-party = [
+    "core",
+    "services",
+]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+docstring-code-format = true
