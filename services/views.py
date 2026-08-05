@@ -20,24 +20,25 @@ class ServiceViewSet(viewsets.ModelViewSet):
     """
     Управление услугами маркетплейса.
     """
+
     queryset = Service.objects.all()
     permission_classes = [IsProviderOrReadOnly]
-    
+
     filter_backends = [
-        DjangoFilterBackend, 
-        filters.SearchFilter, 
-        filters.OrderingFilter
+        DjangoFilterBackend,
+        filters.SearchFilter,
+        filters.OrderingFilter,
     ]
     filterset_fields = {
-        'category': ['exact'],
-        'price': ['gte', 'lte'],
+        "category": ["exact"],
+        "price": ["gte", "lte"],
     }
-    search_fields = ['name', 'description']
-    ordering_fields = ['price', 'created_at']
-    ordering = ['-created_at']
+    search_fields = ["name", "description"]
+    ordering_fields = ["price", "created_at"]
+    ordering = ["-created_at"]
 
     def get_serializer_class(self):
-        if self.action in ['list', 'retrieve']:
+        if self.action in ["list", "retrieve"]:
             return ServiceReadSerializer
         return ServiceWriteSerializer
 
@@ -50,7 +51,7 @@ class CategoryViewSet(viewsets.ModelViewSet):
     Справочник категорий услуг.
     """
 
-    queryset = Category.objects.all().order_by('id')
+    queryset = Category.objects.all().order_by("id")
     serializer_class = CategorySerializer
     permission_classes = [IsAdminOrReadOnly]
 
@@ -68,9 +69,9 @@ class BookingViewSet(
         user = self.request.user
 
         queryset = Booking.objects.select_related(
-            'client',
-            'service',
-            'service__provider',
+            "client",
+            "service",
+            "service__provider",
         )
 
         if user.is_provider:
@@ -83,80 +84,80 @@ class BookingViewSet(
 
     @action(
         detail=True,
-        methods=['post'],
+        methods=["post"],
     )
     def confirm(self, request, pk=None):
         booking = self.get_object()
 
         if booking.service.provider != request.user:
             return Response(
-                {'detail': 'Подтвердить бронирование может только провайдер услуги.'},
+                {"detail": "Подтвердить бронирование может только провайдер услуги."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if booking.status != 'pending':
+        if booking.status != "pending":
             return Response(
-                {'detail': 'Подтвердить можно только ожидающее бронирование.'},
+                {"detail": "Подтвердить можно только ожидающее бронирование."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        booking.status = 'confirmed'
-        booking.save(update_fields=['status'])
+        booking.status = "confirmed"
+        booking.save(update_fields=["status"])
 
         serializer = self.get_serializer(booking)
         return Response(serializer.data)
 
     @action(
         detail=True,
-        methods=['post'],
+        methods=["post"],
     )
     def complete(self, request, pk=None):
         booking = self.get_object()
 
         if booking.service.provider != request.user:
             return Response(
-                {'detail': 'Завершить бронирование может только провайдер услуги.'},
+                {"detail": "Завершить бронирование может только провайдер услуги."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if booking.status != 'confirmed':
+        if booking.status != "confirmed":
             return Response(
-                {'detail': 'Завершить можно только подтверждённое бронирование.'},
+                {"detail": "Завершить можно только подтверждённое бронирование."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        booking.status = 'completed'
-        booking.save(update_fields=['status'])
+        booking.status = "completed"
+        booking.save(update_fields=["status"])
 
         serializer = self.get_serializer(booking)
         return Response(serializer.data)
 
     @action(
         detail=True,
-        methods=['post'],
+        methods=["post"],
     )
     def cancel(self, request, pk=None):
         booking = self.get_object()
 
         if booking.client != request.user:
             return Response(
-                {'detail': 'Отменить бронирование может только клиент.'},
+                {"detail": "Отменить бронирование может только клиент."},
                 status=status.HTTP_403_FORBIDDEN,
             )
 
         allowed_statuses = [
-            'pending',
-            'confirmed',
+            "pending",
+            "confirmed",
         ]
 
         if booking.status not in allowed_statuses:
             return Response(
-                {'detail': 'Это бронирование уже нельзя отменить.'},
+                {"detail": "Это бронирование уже нельзя отменить."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        booking.status = 'canceled'
-        booking.save(update_fields=['status'])
+        booking.status = "canceled"
+        booking.save(update_fields=["status"])
 
         serializer = self.get_serializer(booking)
         return Response(serializer.data)
@@ -173,29 +174,29 @@ class UserViewSet(
     queryset = User.objects.all()
 
     def get_permissions(self):
-        if self.action == 'create':
+        if self.action == "create":
             return [permissions.AllowAny()]
 
         return [permissions.IsAuthenticated()]
 
     def get_serializer_class(self):
-        if self.action == 'create':
+        if self.action == "create":
             return UserRegistrationSerializer
 
-        if self.action == 'me' and self.request.method == 'PATCH':
+        if self.action == "me" and self.request.method == "PATCH":
             return UserUpdateSerializer
 
         return UserReadSerializer
 
     @action(
         detail=False,
-        methods=['get', 'patch'],
-        url_path='me',
+        methods=["get", "patch"],
+        url_path="me",
     )
     def me(self, request):
         user = request.user
 
-        if request.method == 'GET':
+        if request.method == "GET":
             serializer = UserReadSerializer(user)
             return Response(serializer.data)
 

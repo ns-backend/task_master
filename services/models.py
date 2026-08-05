@@ -29,23 +29,19 @@ class Service(models.Model):
     name = models.CharField(max_length=200)
     description = models.TextField()
     price = models.DecimalField(max_digits=10, decimal_places=2)
-    
+
     category = models.ForeignKey(
-        Category, 
-        on_delete=models.CASCADE, 
-        related_name='services'
+        Category, on_delete=models.CASCADE, related_name="services"
     )
     provider = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
-        related_name='services'
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="services"
     )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = "Услуга"
         verbose_name_plural = "Услуги"
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
     def clean(self):
         if self.price <= 0:
@@ -57,34 +53,26 @@ class Service(models.Model):
 
 class Booking(models.Model):
     STATUS_CHOICES = [
-        ('pending', 'В ожидании'),
-        ('confirmed', 'Подтверждено'),
-        ('completed', 'Завершено'),
-        ('canceled', 'Отменено'),
+        ("pending", "В ожидании"),
+        ("confirmed", "Подтверждено"),
+        ("completed", "Завершено"),
+        ("canceled", "Отменено"),
     ]
 
     client = models.ForeignKey(
-        settings.AUTH_USER_MODEL, 
-        on_delete=models.CASCADE, 
-        related_name='bookings'
+        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bookings"
     )
     service = models.ForeignKey(
-        Service, 
-        on_delete=models.CASCADE, 
-        related_name='bookings'
+        Service, on_delete=models.CASCADE, related_name="bookings"
     )
     booking_date = models.DateTimeField()
-    status = models.CharField(
-        max_length=20, 
-        choices=STATUS_CHOICES, 
-        default='pending'
-    )
+    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
         verbose_name = "Бронирование"
         verbose_name_plural = "Бронирования"
-        ordering = ['-created_at']
+        ordering = ["-created_at"]
 
     def clean(self):
         if self.booking_date < timezone.now():
