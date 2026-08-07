@@ -42,6 +42,12 @@ class Service(models.Model):
         verbose_name = "Услуга"
         verbose_name_plural = "Услуги"
         ordering = ["-created_at"]
+        constraints = [
+            models.CheckConstraint(
+                condition=models.Q(price__gt=0),
+                name="service_price_gt_zero",
+            ),
+        ]
 
     def clean(self):
         if self.price <= 0:
@@ -52,21 +58,28 @@ class Service(models.Model):
 
 
 class Booking(models.Model):
-    STATUS_CHOICES = [
-        ("pending", "В ожидании"),
-        ("confirmed", "Подтверждено"),
-        ("completed", "Завершено"),
-        ("canceled", "Отменено"),
-    ]
+    class Status(models.TextChoices):
+        PENDING = "pending", "В ожидании"
+        CONFIRMED = "confirmed", "Подтверждено"
+        COMPLETED = "completed", "Завершено"
+        CANCELED = "canceled", "Отменено"
 
     client = models.ForeignKey(
-        settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="bookings"
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name="bookings",
     )
     service = models.ForeignKey(
-        Service, on_delete=models.CASCADE, related_name="bookings"
+        Service,
+        on_delete=models.CASCADE,
+        related_name="bookings",
     )
     booking_date = models.DateTimeField()
-    status = models.CharField(max_length=20, choices=STATUS_CHOICES, default="pending")
+    status = models.CharField(
+        max_length=20,
+        choices=Status.choices,
+        default=Status.PENDING,
+    )
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
