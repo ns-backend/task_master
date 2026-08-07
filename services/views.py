@@ -3,6 +3,12 @@ from rest_framework import filters, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
+from services.booking_services import (
+    cancel_booking,
+    complete_booking,
+    confirm_booking,
+)
+
 from .models import Booking, Category, Service, User
 from .permissions import IsAdminOrReadOnly, IsProviderOrReadOnly
 from .serializers import (
@@ -82,82 +88,32 @@ class BookingViewSet(
     def perform_create(self, serializer):
         serializer.save(client=self.request.user)
 
-    @action(
-        detail=True,
-        methods=["post"],
-    )
+    @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
-        booking = self.get_object()
-
-        if booking.service.provider != request.user:
-            return Response(
-                {"detail": "Подтвердить бронирование может только провайдер услуги."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        if booking.status != Booking.Status.PENDING:
-            return Response(
-                {"detail": "Подтвердить можно только ожидающее бронирование."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        booking.status = Booking.Status.CONFIRMED
-        booking.save(update_fields=["status"])
+        booking = confirm_booking(
+            booking=self.get_object(),
+            actor=request.user,
+        )
 
         serializer = self.get_serializer(booking)
         return Response(serializer.data)
 
-    @action(
-        detail=True,
-        methods=["post"],
-    )
+    @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
-        booking = self.get_object()
-
-        if booking.service.provider != request.user:
-            return Response(
-                {"detail": "Завершить бронирование может только провайдер услуги."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        if booking.status != Booking.Status.CONFIRMED:
-            return Response(
-                {"detail": "Завершить можно только подтверждённое бронирование."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        booking.status = Booking.Status.COMPLETED
-        booking.save(update_fields=["status"])
+        booking = complete_booking(
+            booking=self.get_object(),
+            actor=request.user,
+        )
 
         serializer = self.get_serializer(booking)
         return Response(serializer.data)
 
-    @action(
-        detail=True,
-        methods=["post"],
-    )
+    @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
-        booking = self.get_object()
-
-        if booking.client != request.user:
-            return Response(
-                {"detail": "Отменить бронирование может только клиент."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
-        allowed_statuses = [
-            Booking.Status.PENDING,
-            Booking.Status.CONFIRMED,
-        ]
-
-        if booking.status not in allowed_statuses:
-            return Response(
-                {"detail": "Это бронирование уже нельзя отменить."},
-                status=status.HTTP_400_BAD_REQUEST,
-            )
-
-        booking.status = Booking.Status.CANCELED
-        booking.save(update_fields=["status"])
+        booking = cancel_booking(
+            booking=self.get_object(),
+            actor=request.user,
+        )
 
         serializer = self.get_serializer(booking)
         return Response(serializer.data)
