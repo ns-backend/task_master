@@ -87,7 +87,7 @@ def test_booking_cannot_be_updated_with_patch(
     response = api_client.patch(
         f"/api/bookings/{booking.id}/",
         {
-            "status": "completed",
+            "status": Booking.Status.COMPLETED,
         },
         format="json",
     )
@@ -96,7 +96,7 @@ def test_booking_cannot_be_updated_with_patch(
 
     booking.refresh_from_db()
 
-    assert booking.status != "completed"
+    assert booking.status != Booking.Status.COMPLETED
 
 
 def test_booking_cannot_be_deleted(
@@ -204,8 +204,8 @@ def test_provider_can_confirm_pending_booking(
 
     booking.refresh_from_db()
 
-    assert booking.status == "confirmed"
-    assert response.data["status"] == "confirmed"
+    assert booking.status == Booking.Status.CONFIRMED
+    assert response.data["status"] == Booking.Status.CONFIRMED
 
 
 def test_client_cannot_confirm_booking(
@@ -225,7 +225,7 @@ def test_client_cannot_confirm_booking(
 
     booking.refresh_from_db()
 
-    assert booking.status == "pending"
+    assert booking.status == Booking.Status.PENDING
 
 
 def test_other_provider_cannot_confirm_booking(
@@ -245,7 +245,7 @@ def test_other_provider_cannot_confirm_booking(
 
     booking.refresh_from_db()
 
-    assert booking.status == "pending"
+    assert booking.status == Booking.Status.PENDING
 
 
 def test_confirmed_booking_cannot_be_confirmed_again(
@@ -253,7 +253,7 @@ def test_confirmed_booking_cannot_be_confirmed_again(
     provider_user,
     booking,
 ):
-    booking.status = "confirmed"
+    booking.status = Booking.Status.CONFIRMED
     booking.save(update_fields=["status"])
 
     api_client.force_authenticate(user=provider_user)
@@ -268,7 +268,7 @@ def test_confirmed_booking_cannot_be_confirmed_again(
 
     booking.refresh_from_db()
 
-    assert booking.status == "confirmed"
+    assert booking.status == Booking.Status.CONFIRMED
 
 
 def test_provider_can_complete_confirmed_booking(
@@ -276,7 +276,7 @@ def test_provider_can_complete_confirmed_booking(
     provider_user,
     booking,
 ):
-    booking.status = "confirmed"
+    booking.status = Booking.Status.CONFIRMED
     booking.save(update_fields=["status"])
 
     api_client.force_authenticate(user=provider_user)
@@ -291,8 +291,8 @@ def test_provider_can_complete_confirmed_booking(
 
     booking.refresh_from_db()
 
-    assert booking.status == "completed"
-    assert response.data["status"] == "completed"
+    assert booking.status == Booking.Status.COMPLETED
+    assert response.data["status"] == Booking.Status.COMPLETED
 
 
 def test_pending_booking_cannot_be_completed(
@@ -312,7 +312,7 @@ def test_pending_booking_cannot_be_completed(
 
     booking.refresh_from_db()
 
-    assert booking.status == "pending"
+    assert booking.status == Booking.Status.PENDING
 
 
 def test_client_cannot_complete_booking(
@@ -320,7 +320,7 @@ def test_client_cannot_complete_booking(
     client_user,
     booking,
 ):
-    booking.status = "confirmed"
+    booking.status = Booking.Status.CONFIRMED
     booking.save(update_fields=["status"])
 
     api_client.force_authenticate(user=client_user)
@@ -335,7 +335,7 @@ def test_client_cannot_complete_booking(
 
     booking.refresh_from_db()
 
-    assert booking.status == "confirmed"
+    assert booking.status == Booking.Status.CONFIRMED
 
 
 def test_other_provider_cannot_complete_booking(
@@ -343,7 +343,7 @@ def test_other_provider_cannot_complete_booking(
     another_provider,
     booking,
 ):
-    booking.status = "confirmed"
+    booking.status = Booking.Status.CONFIRMED
     booking.save(update_fields=["status"])
 
     api_client.force_authenticate(user=another_provider)
@@ -358,7 +358,7 @@ def test_other_provider_cannot_complete_booking(
 
     booking.refresh_from_db()
 
-    assert booking.status == "confirmed"
+    assert booking.status == Booking.Status.CONFIRMED
 
 
 def test_client_can_cancel_pending_booking(
@@ -378,8 +378,8 @@ def test_client_can_cancel_pending_booking(
 
     booking.refresh_from_db()
 
-    assert booking.status == "canceled"
-    assert response.data["status"] == "canceled"
+    assert booking.status == Booking.Status.CANCELED
+    assert response.data["status"] == Booking.Status.CANCELED
 
 
 def test_client_can_cancel_confirmed_booking(
@@ -387,7 +387,7 @@ def test_client_can_cancel_confirmed_booking(
     client_user,
     booking,
 ):
-    booking.status = "confirmed"
+    booking.status = Booking.Status.CONFIRMED
     booking.save(update_fields=["status"])
 
     api_client.force_authenticate(user=client_user)
@@ -402,7 +402,7 @@ def test_client_can_cancel_confirmed_booking(
 
     booking.refresh_from_db()
 
-    assert booking.status == "canceled"
+    assert booking.status == Booking.Status.CANCELED
 
 
 def test_completed_booking_cannot_be_canceled(
@@ -410,7 +410,7 @@ def test_completed_booking_cannot_be_canceled(
     client_user,
     booking,
 ):
-    booking.status = "completed"
+    booking.status = Booking.Status.COMPLETED
     booking.save(update_fields=["status"])
 
     api_client.force_authenticate(user=client_user)
@@ -425,7 +425,7 @@ def test_completed_booking_cannot_be_canceled(
 
     booking.refresh_from_db()
 
-    assert booking.status == "completed"
+    assert booking.status == Booking.Status.COMPLETED
 
 
 def test_canceled_booking_cannot_be_canceled_again(
@@ -433,7 +433,7 @@ def test_canceled_booking_cannot_be_canceled_again(
     client_user,
     booking,
 ):
-    booking.status = "canceled"
+    booking.status = Booking.Status.CANCELED
     booking.save(update_fields=["status"])
 
     api_client.force_authenticate(user=client_user)
@@ -448,7 +448,7 @@ def test_canceled_booking_cannot_be_canceled_again(
 
     booking.refresh_from_db()
 
-    assert booking.status == "canceled"
+    assert booking.status == Booking.Status.CANCELED
 
 
 def test_provider_cannot_cancel_booking(
@@ -468,7 +468,7 @@ def test_provider_cannot_cancel_booking(
 
     booking.refresh_from_db()
 
-    assert booking.status == "pending"
+    assert booking.status == Booking.Status.PENDING
 
 
 def test_canceled_booking_cannot_be_confirmed(
@@ -476,7 +476,7 @@ def test_canceled_booking_cannot_be_confirmed(
     provider_user,
     booking,
 ):
-    booking.status = "canceled"
+    booking.status = Booking.Status.CANCELED
     booking.save(update_fields=["status"])
 
     api_client.force_authenticate(user=provider_user)
@@ -491,7 +491,7 @@ def test_canceled_booking_cannot_be_confirmed(
 
     booking.refresh_from_db()
 
-    assert booking.status == "canceled"
+    assert booking.status == Booking.Status.CANCELED
 
 
 def test_completed_booking_cannot_be_confirmed(
@@ -499,7 +499,7 @@ def test_completed_booking_cannot_be_confirmed(
     provider_user,
     booking,
 ):
-    booking.status = "completed"
+    booking.status = Booking.Status.COMPLETED
     booking.save(update_fields=["status"])
 
     api_client.force_authenticate(user=provider_user)
@@ -514,4 +514,4 @@ def test_completed_booking_cannot_be_confirmed(
 
     booking.refresh_from_db()
 
-    assert booking.status == "completed"
+    assert booking.status == Booking.Status.COMPLETED

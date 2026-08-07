@@ -95,13 +95,13 @@ class BookingViewSet(
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if booking.status != "pending":
+        if booking.status != Booking.Status.PENDING:
             return Response(
                 {"detail": "Подтвердить можно только ожидающее бронирование."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        booking.status = "confirmed"
+        booking.status = Booking.Status.CONFIRMED
         booking.save(update_fields=["status"])
 
         serializer = self.get_serializer(booking)
@@ -120,13 +120,13 @@ class BookingViewSet(
                 status=status.HTTP_403_FORBIDDEN,
             )
 
-        if booking.status != "confirmed":
+        if booking.status != Booking.Status.CONFIRMED:
             return Response(
                 {"detail": "Завершить можно только подтверждённое бронирование."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        booking.status = "completed"
+        booking.status = Booking.Status.COMPLETED
         booking.save(update_fields=["status"])
 
         serializer = self.get_serializer(booking)
@@ -146,8 +146,8 @@ class BookingViewSet(
             )
 
         allowed_statuses = [
-            "pending",
-            "confirmed",
+            Booking.Status.PENDING,
+            Booking.Status.CONFIRMED,
         ]
 
         if booking.status not in allowed_statuses:
@@ -156,7 +156,7 @@ class BookingViewSet(
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        booking.status = "canceled"
+        booking.status = Booking.Status.CANCELED
         booking.save(update_fields=["status"])
 
         serializer = self.get_serializer(booking)
