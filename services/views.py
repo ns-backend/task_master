@@ -27,7 +27,10 @@ class ServiceViewSet(viewsets.ModelViewSet):
     Управление услугами маркетплейса.
     """
 
-    queryset = Service.objects.all()
+    queryset = Service.objects.select_related(
+        "category",
+        "provider",
+    )
     permission_classes = [IsProviderOrReadOnly]
 
     filter_backends = [
