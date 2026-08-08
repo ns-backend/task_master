@@ -1,15 +1,10 @@
 import pytest
 from django.urls import reverse
 from rest_framework import status
-from rest_framework.test import APIClient
 
 from services.models import Category, Service, User
 
 pytestmark = pytest.mark.django_db
-
-
-def api_client():
-    return APIClient()
 
 
 def test_create_service_unauthenticated(api_client):
@@ -188,3 +183,119 @@ def test_provider_cannot_delete_another_provider_service(
     }
 
     assert Service.objects.filter(id=service.id).exists()
+
+
+def test_service_list_has_no_n_plus_one(
+    api_client,
+    provider_user,
+    category,
+    django_assert_max_num_queries,
+):
+    Service.objects.bulk_create(
+        [
+            Service(
+                name=f"Service {index}",
+                description="Description",
+                price=100,
+                provider=provider_user,
+                category=category,
+            )
+            for index in range(10)
+        ]
+    )
+
+    with django_assert_max_num_queries(5):
+        response = api_client.get("/api/services/")
+
+    assert response.status_code == status.HTTP_200_OK
+
+
+def test_service_filter_by_category(
+    api_client,
+    service,
+    provider_user,
+):
+    other_category = Category.objects.create(
+        name="Cleaning",
+        slug="cleaning-filter",
+    )
+
+    Service.objects.create(
+        name="Cleaning service",
+        description="Cleaning",
+        price=100,
+        provider=provider_user,
+        category=other_category,
+    )
+
+    response = api_client.get(
+        "/api/services/",
+        {"category": service.category_id},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    results = response.data["results"]
+
+    assert len(results) == 1
+    assert results[0]["id"] == service.id
+
+
+def test_service_search_by_name(
+    api_client,
+    service,
+    provider_user,
+    category,
+):
+    Service.objects.create(
+        name="Уборка квартиры",
+        description="Полная уборка",
+        price=100,
+        provider=provider_user,
+        category=category,
+    )
+
+    response = api_client.get(
+        "/api/services/",
+        {"search": "Сборка"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    results = response.data["results"]
+
+    assert len(results) == 1
+    assert results[0]["id"] == service.id
+
+
+def test_service_ordering_by_price(
+    api_client,
+    provider_user,
+    category,
+):
+    expensive = Service.objects.create(
+        name="Expensive",
+        description="Expensive service",
+        price=200,
+        provider=provider_user,
+        category=category,
+    )
+
+    cheap = Service.objects.create(
+        name="Cheap",
+        description="Cheap service",
+        price=50,
+        provider=provider_user,
+        category=category,
+    )
+
+    response = api_client.get(
+        "/api/services/",
+        {"ordering": "price"},
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    result_ids = [item["id"] for item in response.data["results"]]
+
+    assert result_ids.index(cheap.id) < result_ids.index(expensive.id)
