@@ -21,7 +21,7 @@ class IsProviderOrReadOnly(permissions.BasePermission):
             return True
 
         # Редактировать или удалять может только сам автор услуги
-        # В твоем ServiceViewSet автор хранится в поле provider
+        # Изменять или удалять услугу может только её provider.
         return obj.provider == request.user
 
 

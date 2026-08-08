@@ -132,10 +132,7 @@ def test_provider_cannot_update_another_provider_service(
         format="json",
     )
 
-    assert response.status_code in {
-        status.HTTP_403_FORBIDDEN,
-        status.HTTP_404_NOT_FOUND,
-    }
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
     service.refresh_from_db()
 
@@ -177,10 +174,7 @@ def test_provider_cannot_delete_another_provider_service(
         f"/api/services/{service.id}/",
     )
 
-    assert response.status_code in {
-        status.HTTP_403_FORBIDDEN,
-        status.HTTP_404_NOT_FOUND,
-    }
+    assert response.status_code == status.HTTP_403_FORBIDDEN
 
     assert Service.objects.filter(id=service.id).exists()
 
@@ -299,3 +293,15 @@ def test_service_ordering_by_price(
     result_ids = [item["id"] for item in response.data["results"]]
 
     assert result_ids.index(cheap.id) < result_ids.index(expensive.id)
+
+
+def test_service_detail_is_public(
+    api_client,
+    service,
+):
+    response = api_client.get(
+        f"/api/services/{service.id}/",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["id"] == service.id
