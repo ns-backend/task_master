@@ -53,6 +53,19 @@ class UserUpdateSerializer(serializers.ModelSerializer):
             "phone_number",
         ]
 
+    def validate(self, attrs):
+        allowed_fields = set(self.fields)
+        received_fields = set(self.initial_data)
+
+        unknown_fields = received_fields - allowed_fields
+
+        if unknown_fields:
+            raise serializers.ValidationError(
+                {field: "Это поле нельзя изменять." for field in unknown_fields}
+            )
+
+        return attrs
+
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta:

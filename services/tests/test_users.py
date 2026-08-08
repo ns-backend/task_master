@@ -82,7 +82,8 @@ def test_user_cannot_change_provider_role(
         format="json",
     )
 
-    assert response.status_code == status.HTTP_200_OK
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert "is_provider" in response.data
 
     client_user.refresh_from_db()
 
@@ -131,3 +132,56 @@ def test_user_cannot_update_another_user(
     provider_user.refresh_from_db()
 
     assert provider_user.email == "provider@example.com"
+
+
+def test_user_cannot_change_role_through_profile(
+    api_client,
+    client_user,
+):
+    api_client.force_authenticate(user=client_user)
+
+    response = api_client.patch(
+        "/api/users/me/",
+        {
+            "is_provider": True,
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+
+    client_user.refresh_from_db()
+
+    assert client_user.is_provider is False
+
+
+def test_user_can_register_as_provider(api_client):
+    response = api_client.post(
+        "/api/users/",
+        {
+            "username": "new_provider",
+            "email": "new_provider@example.com",
+            "password": "strong-password-123",
+            "is_provider": True,
+            "phone_number": "+49123456789",
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+
+    user = User.objects.get(username="new_provider")
+
+    assert user.is_provider is True
+
+
+def test_service_detail_is_public(
+    api_client,
+    service,
+):
+    response = api_client.get(
+        f"/api/services/{service.id}/",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+    assert response.data["id"] == service.id
