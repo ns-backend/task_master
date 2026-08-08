@@ -13,7 +13,8 @@ pytestmark = pytest.mark.django_db
 
 def test_provider_can_confirm_pending_booking(booking, provider_user):
     result = confirm_booking(
-        booking=booking,
+        queryset=Booking.objects.all(),
+        booking_id=booking.pk,
         actor=provider_user,
     )
 
@@ -26,7 +27,8 @@ def test_provider_can_confirm_pending_booking(booking, provider_user):
 def test_client_cannot_confirm_booking(booking, client_user):
     with pytest.raises(PermissionDenied):
         confirm_booking(
-            booking=booking,
+            queryset=Booking.objects.all(),
+            booking_id=booking.pk,
             actor=client_user,
         )
 
@@ -37,7 +39,8 @@ def test_confirm_requires_pending_status(booking, provider_user):
 
     with pytest.raises(ValidationError):
         confirm_booking(
-            booking=booking,
+            queryset=Booking.objects.all(),
+            booking_id=booking.pk,
             actor=provider_user,
         )
 
@@ -50,7 +53,8 @@ def test_provider_can_complete_confirmed_booking(
     booking.save(update_fields=["status"])
 
     complete_booking(
-        booking=booking,
+        queryset=Booking.objects.all(),
+        booking_id=booking.pk,
         actor=provider_user,
     )
 
@@ -65,7 +69,8 @@ def test_complete_requires_confirmed_status(
 ):
     with pytest.raises(ValidationError):
         complete_booking(
-            booking=booking,
+            queryset=Booking.objects.all(),
+            booking_id=booking.pk,
             actor=provider_user,
         )
 
@@ -86,7 +91,8 @@ def test_client_can_cancel_active_booking(
     booking.save(update_fields=["status"])
 
     cancel_booking(
-        booking=booking,
+        queryset=Booking.objects.all(),
+        booking_id=booking.pk,
         actor=client_user,
     )
 
@@ -101,7 +107,8 @@ def test_provider_cannot_cancel_booking(
 ):
     with pytest.raises(PermissionDenied):
         cancel_booking(
-            booking=booking,
+            queryset=Booking.objects.all(),
+            booking_id=booking.pk,
             actor=provider_user,
         )
 
@@ -123,6 +130,25 @@ def test_client_cannot_cancel_inactive_booking(
 
     with pytest.raises(ValidationError):
         cancel_booking(
-            booking=booking,
+            queryset=Booking.objects.all(),
+            booking_id=booking.pk,
             actor=client_user,
         )
+
+
+def test_failed_confirmation_does_not_change_booking(
+    booking,
+    client_user,
+):
+    original_status = booking.status
+
+    with pytest.raises(PermissionDenied):
+        confirm_booking(
+            queryset=Booking.objects.all(),
+            booking_id=booking.pk,
+            actor=client_user,
+        )
+
+    booking.refresh_from_db()
+
+    assert booking.status == original_status

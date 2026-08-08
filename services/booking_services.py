@@ -1,9 +1,37 @@
+from django.db import transaction
+from django.db.models import QuerySet
+from django.shortcuts import get_object_or_404
 from rest_framework.exceptions import PermissionDenied, ValidationError
 
 from services.models import Booking
 
 
-def confirm_booking(*, booking: Booking, actor) -> Booking:
+def _get_booking_for_update(
+    *,
+    queryset: QuerySet,
+    booking_id: int,
+) -> Booking:
+    return get_object_or_404(
+        queryset.select_for_update().select_related(
+            "client",
+            "service__provider",
+        ),
+        pk=booking_id,
+    )
+
+
+@transaction.atomic
+def confirm_booking(
+    *,
+    queryset: QuerySet,
+    booking_id: int,
+    actor,
+) -> Booking:
+    booking = _get_booking_for_update(
+        queryset=queryset,
+        booking_id=booking_id,
+    )
+
     if booking.service.provider != actor:
         raise PermissionDenied(
             "Подтвердить бронирование может только провайдер услуги."
@@ -18,7 +46,18 @@ def confirm_booking(*, booking: Booking, actor) -> Booking:
     return booking
 
 
-def complete_booking(*, booking: Booking, actor) -> Booking:
+@transaction.atomic
+def complete_booking(
+    *,
+    queryset: QuerySet,
+    booking_id: int,
+    actor,
+) -> Booking:
+    booking = _get_booking_for_update(
+        queryset=queryset,
+        booking_id=booking_id,
+    )
+
     if booking.service.provider != actor:
         raise PermissionDenied("Завершить бронирование может только провайдер услуги.")
 
@@ -31,7 +70,18 @@ def complete_booking(*, booking: Booking, actor) -> Booking:
     return booking
 
 
-def cancel_booking(*, booking: Booking, actor) -> Booking:
+@transaction.atomic
+def cancel_booking(
+    *,
+    queryset: QuerySet,
+    booking_id: int,
+    actor,
+) -> Booking:
+    booking = _get_booking_for_update(
+        queryset=queryset,
+        booking_id=booking_id,
+    )
+
     if booking.client != actor:
         raise PermissionDenied("Отменить бронирование может только клиент.")
 
