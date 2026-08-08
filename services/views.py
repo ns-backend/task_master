@@ -91,7 +91,8 @@ class BookingViewSet(
     @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
         booking = confirm_booking(
-            booking=self.get_object(),
+            queryset=self.get_queryset(),
+            booking_id=pk,
             actor=request.user,
         )
 
@@ -101,7 +102,8 @@ class BookingViewSet(
     @action(detail=True, methods=["post"])
     def complete(self, request, pk=None):
         booking = complete_booking(
-            booking=self.get_object(),
+            queryset=self.get_queryset(),
+            booking_id=pk,
             actor=request.user,
         )
 
@@ -111,7 +113,8 @@ class BookingViewSet(
     @action(detail=True, methods=["post"])
     def cancel(self, request, pk=None):
         booking = cancel_booking(
-            booking=self.get_object(),
+            queryset=self.get_queryset(),
+            booking_id=pk,
             actor=request.user,
         )
 
