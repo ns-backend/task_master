@@ -23,6 +23,15 @@ class UserReadSerializer(serializers.ModelSerializer):
         ]
 
 
+class ProviderPublicSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = [
+            "id",
+            "username",
+        ]
+
+
 class UserRegistrationSerializer(serializers.ModelSerializer):
     password = serializers.CharField(
         write_only=True,
@@ -90,7 +99,7 @@ class ServiceReadSerializer(serializers.ModelSerializer):
     """Сериализатор для подробного отображения услуг."""
 
     category = CategorySerializer(read_only=True)
-    provider = UserReadSerializer(read_only=True)
+    provider = ProviderPublicSerializer(read_only=True)
 
     class Meta:
         model = Service
