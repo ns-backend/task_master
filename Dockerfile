@@ -10,10 +10,12 @@ RUN python -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Копируем манифест зависимостей
-COPY ./requirements.txt .
+COPY requirements.txt .
+COPY requirements ./requirements
 
 # Обновляем менеджер пакетов и устанавливаем зависимости без сохранения кэша
-RUN pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
+RUN pip install --upgrade pip \
+    && pip install --no-cache-dir -r requirements.txt
 
 
 # ==========================================

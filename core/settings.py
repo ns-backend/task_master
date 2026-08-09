@@ -5,11 +5,27 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+def get_required_env(name: str) -> str:
+    value = os.getenv(name)
+
+    if not value:
+        raise RuntimeError(f"Required environment variable {name} is not set.")
+
+    return value
+
+
 # --- Base settings ---
 BASE_DIR = Path(__file__).resolve().parent.parent
-SECRET_KEY = os.getenv("SECRET_KEY")
-DEBUG = os.getenv("DEBUG", "False") == "True"
-ALLOWED_HOSTS = os.getenv("ALLOWED_HOSTS", "").split(",")
+SECRET_KEY = get_required_env("SECRET_KEY")
+DEBUG = os.getenv("DEBUG", "false").lower() in {
+    "1",
+    "true",
+    "yes",
+}
+ALLOWED_HOSTS = [
+    host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host.strip()
+]
 
 # --- Auth & User model ---
 AUTH_USER_MODEL = "services.User"
@@ -47,11 +63,11 @@ WSGI_APPLICATION = "core.wsgi.application"
 DATABASES = {
     "default": {
         "ENGINE": "django.db.backends.postgresql",
-        "NAME": os.getenv("DB_NAME"),
-        "USER": os.getenv("DB_USER"),
-        "PASSWORD": os.getenv("DB_PASSWORD"),
-        "HOST": os.getenv("DB_HOST"),
-        "PORT": os.getenv("DB_PORT"),
+        "NAME": get_required_env("DB_NAME"),
+        "USER": get_required_env("DB_USER"),
+        "PASSWORD": get_required_env("DB_PASSWORD"),
+        "HOST": get_required_env("DB_HOST"),
+        "PORT": get_required_env("DB_PORT"),
     }
 }
 
