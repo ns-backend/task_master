@@ -305,3 +305,41 @@ def test_service_detail_is_public(
 
     assert response.status_code == status.HTTP_200_OK
     assert response.data["id"] == service.id
+
+
+def test_service_does_not_expose_provider_private_data(
+    api_client,
+    service,
+):
+    response = api_client.get(
+        f"/api/services/{service.id}/",
+    )
+
+    assert response.status_code == status.HTTP_200_OK
+
+    provider_data = response.data["provider"]
+
+    assert provider_data["id"] == service.provider.id
+    assert provider_data["username"] == service.provider.username
+    assert "email" not in provider_data
+    assert "phone_number" not in provider_data
+
+
+def test_service_list_does_not_expose_provider_private_data(
+    api_client,
+    service,
+):
+    response = api_client.get("/api/services/")
+
+    assert response.status_code == status.HTTP_200_OK
+
+    service_data = next(
+        item for item in response.data["results"] if item["id"] == service.id
+    )
+
+    provider_data = service_data["provider"]
+
+    assert provider_data["id"] == service.provider.id
+    assert provider_data["username"] == service.provider.username
+    assert "email" not in provider_data
+    assert "phone_number" not in provider_data
