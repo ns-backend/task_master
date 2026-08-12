@@ -1,6 +1,8 @@
+from django.db import IntegrityError, transaction
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework import filters, mixins, permissions, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
 from services.booking_services import (
@@ -71,16 +73,21 @@ class BookingViewSet(
     mixins.RetrieveModelMixin,
     viewsets.GenericViewSet,
 ):
+    queryset = Booking.objects.all()
     serializer_class = BookingSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         user = self.request.user
 
-        queryset = Booking.objects.select_related(
-            "client",
-            "service",
-            "service__provider",
+        queryset = (
+            super()
+            .get_queryset()
+            .select_related(
+                "client",
+                "service",
+                "service__provider",
+            )
         )
 
         if user.is_provider:
@@ -89,7 +96,24 @@ class BookingViewSet(
         return queryset.filter(client=user)
 
     def perform_create(self, serializer):
-        serializer.save(client=self.request.user)
+        try:
+            with transaction.atomic():
+                serializer.save(client=self.request.user)
+        except IntegrityError as exc:
+            cause = exc.__cause__
+            diagnostics = getattr(cause, "diag", None)
+            constraint_name = getattr(
+                diagnostics,
+                "constraint_name",
+                None,
+            )
+
+            if constraint_name == "unique_active_booking_slot":
+                raise ValidationError(
+                    {"booking_date": ("Это время уже занято для выбранной услуги.")}
+                ) from exc
+
+            raise
 
     @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):

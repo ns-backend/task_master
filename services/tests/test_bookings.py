@@ -1,6 +1,7 @@
 from datetime import timedelta
 
 import pytest
+from django.db import IntegrityError, transaction
 from django.utils import timezone
 from rest_framework import status
 
@@ -515,3 +516,80 @@ def test_completed_booking_cannot_be_confirmed(
     booking.refresh_from_db()
 
     assert booking.status == Booking.Status.COMPLETED
+
+
+def test_same_service_and_time_cannot_be_booked_twice(
+    api_client,
+    client_user,
+    another_client,
+    service,
+    future_booking_date,
+):
+    Booking.objects.create(
+        client=client_user,
+        service=service,
+        booking_date=future_booking_date,
+    )
+
+    api_client.force_authenticate(user=another_client)
+
+    response = api_client.post(
+        "/api/bookings/",
+        {
+            "service": service.id,
+            "booking_date": future_booking_date.isoformat(),
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_400_BAD_REQUEST
+    assert Booking.objects.count() == 1
+
+
+def test_canceled_booking_releases_time_slot(
+    api_client,
+    client_user,
+    another_client,
+    service,
+    future_booking_date,
+):
+    Booking.objects.create(
+        client=client_user,
+        service=service,
+        booking_date=future_booking_date,
+        status=Booking.Status.CANCELED,
+    )
+
+    api_client.force_authenticate(user=another_client)
+
+    response = api_client.post(
+        "/api/bookings/",
+        {
+            "service": service.id,
+            "booking_date": future_booking_date.isoformat(),
+        },
+        format="json",
+    )
+
+    assert response.status_code == status.HTTP_201_CREATED
+
+
+def test_database_prevents_duplicate_active_booking(
+    client_user,
+    another_client,
+    service,
+    future_booking_date,
+):
+    Booking.objects.create(
+        client=client_user,
+        service=service,
+        booking_date=future_booking_date,
+    )
+
+    with pytest.raises(IntegrityError):
+        with transaction.atomic():
+            Booking.objects.create(
+                client=another_client,
+                service=service,
+                booking_date=future_booking_date,
+            )

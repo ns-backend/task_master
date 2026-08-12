@@ -17,17 +17,20 @@ services:
       timeout: 5s
       retries: 5
   web:
-      build: .
-      command: python manage.py runserver 0.0.0.0:8000
-      volumes:
-        - .:/task_master
-      ports:
-        - 8000:8000
-      env_file:
-        - ./.env
-      depends_on:
-        db:
-          condition: service_healthy
+    build:
+      context: .
+      args:
+        REQUIREMENTS_FILE: requirements/dev.txt
+    command: python manage.py runserver 0.0.0.0:8000
+    volumes:
+      - .:/task_master
+    ports:
+      - 8000:8000
+    env_file:
+      - ./.env
+    depends_on:
+      db:
+        condition: service_healthy
 
 volumes:
   postgres_data:
