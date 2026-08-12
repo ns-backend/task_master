@@ -4,7 +4,7 @@
 
 REST API для маркетплейса услуг на Django REST Framework.
 
-Task Master позволяет провайдерам публиковать услуги, а клиентам — находить и бронировать их. Проект включает ролевую модель доступа, жизненный цикл бронирований, JWT-аутентификацию, фильтрацию и поиск, защиту бизнес-операций от конкурентных изменений, автоматические тесты, статический анализ и CI.
+Task Master позволяет провайдерам публиковать услуги, а клиентам — находить и бронировать их. Проект включает ролевую модель доступа, жизненный цикл бронирований, JWT-аутентификацию, фильтрацию и поиск, защиту бизнес-операций от конкурентных изменений, ограничения целостности на уровне PostgreSQL, автоматические тесты, статический анализ и CI.
 
 ## Возможности
 
@@ -18,10 +18,12 @@ Task Master позволяет провайдерам публиковать у�
 - поиск по названию и описанию;
 - сортировка по цене и дате создания;
 - создание бронирований клиентами;
+- защита одного временного слота услуги от нескольких активных бронирований;
 - подтверждение и завершение бронирований провайдерами;
 - отмена активных бронирований клиентами;
+- защита переходов статусов от race conditions;
 - Swagger/OpenAPI-документация;
-- тестирование API, permissions, моделей и бизнес-логики;
+- тестирование API, permissions, моделей, бизнес-логики и конкурентных транзакций;
 - linting и formatting через Ruff;
 - автоматические проверки через pre-commit;
 - CI через GitHub Actions.
@@ -43,7 +45,8 @@ Task Master позволяет провайдерам публиковать у�
 - создавать и изменять услуги;
 - управлять категориями;
 - изменять статус бронирования напрямую;
-- бронировать собственную услугу.
+- бронировать собственную услугу;
+- создавать второе активное бронирование уже занятого времени одной услуги.
 
 ### Провайдер
 
@@ -104,6 +107,51 @@ confirmed → canceled
 
 Статус нельзя произвольно изменить через обычный `PATCH`: переходы выполняются через отдельные действия API.
 
+## Временные слоты и конфликтующие бронирования
+
+Для одной услуги запрещено существование двух активных бронирований на одинаковый `booking_date`.
+
+Активными считаются статусы:
+
+```text
+pending
+confirmed
+```
+
+То есть следующая комбинация недопустима:
+
+```text
+Service A + 2026-08-20 15:00 + pending
+Service A + 2026-08-20 15:00 + confirmed
+```
+
+После отмены бронирования временной слот освобождается:
+
+```text
+canceled → слот снова доступен
+```
+
+Обычный конфликт проверяется на уровне serializer и возвращает:
+
+```text
+400 Bad Request
+```
+
+При этом целостность дополнительно защищается на уровне PostgreSQL через conditional `UniqueConstraint`.
+
+Это важно при конкурентных запросах: две транзакции могут одновременно пройти Python-проверку, поэтому окончательной гарантией уникальности остаётся база данных.
+
+Текущее ограничение защищает совпадение точного `booking_date`.
+
+Полноценные пересекающиеся интервалы, например:
+
+```text
+10:00–11:00
+10:30–11:30
+```
+
+пока не моделируются, так как услуга не содержит продолжительность или отдельную модель временных слотов.
+
 ## Архитектура
 
 Проект разделяет HTTP-слой и бизнес-логику.
@@ -130,6 +178,8 @@ ViewSet отвечает за:
 Для услуг используются отдельные сериализаторы чтения и записи.
 
 `ServiceReadSerializer` возвращает подробное представление услуги, а `ServiceWriteSerializer` принимает только поля, которые пользователь действительно может изменять.
+
+Публичное представление провайдера отделено от сериализатора пользовательского профиля, поэтому публичный endpoint услуги не раскрывает приватные поля профиля автоматически.
 
 ### Booking service layer
 
@@ -163,7 +213,7 @@ transaction.atomic
 select_for_update()
 ```
 
-Это предотвращает ситуацию, когда два конкурентных запроса одновременно читают один старый статус и оба пытаются выполнить переход состояния.
+Это предотвращает ситуацию, когда два конкурентных запроса одновременно принимают решение на основании одного устаревшего состояния бронирования.
 
 Упрощённо:
 
@@ -182,10 +232,46 @@ select_for_update()
         ↓
 commit
         ↓
-второй запрос продолжает уже с актуальным состоянием
+второй запрос продолжает
+        ↓
+видит уже актуальное состояние
 ```
 
 Блокировка применяется внутри транзакции и действует до её завершения.
+
+### Concurrency integration test
+
+Работа row-level locking проверяется отдельным интеграционным тестом на PostgreSQL.
+
+Тест запускает две независимые транзакции в разных потоках:
+
+```text
+Transaction A
+    ↓
+SELECT ... FOR UPDATE
+    ↓
+pending → confirmed
+    ↓
+удерживает row lock
+
+Transaction B
+    ↓
+пытается выполнить complete_booking()
+    ↓
+ждёт освобождения row lock
+
+Transaction A
+    ↓
+COMMIT
+
+Transaction B
+    ↓
+видит confirmed
+    ↓
+confirmed → completed
+```
+
+Таким образом тест проверяет не только конечный статус, но и реальное ожидание блокировки второй PostgreSQL-транзакцией.
 
 ## Контроль доступа к объектам
 
@@ -220,6 +306,8 @@ Queryset сразу ограничивается текущим пользова
 ```
 
 Так API не раскрывает наличие чужих бронирований.
+
+`BookingViewSet` также содержит базовый queryset для корректной OpenAPI introspection, но реальные API-запросы продолжают использовать пользовательскую фильтрацию через `get_queryset()`.
 
 ## API contract профиля
 
@@ -258,6 +346,8 @@ API не игнорирует такие поля молча, а явно соо
 
 ## Валидация и ограничения базы данных
 
+### Цена услуги
+
 Цена услуги должна быть больше нуля.
 
 Это правило проверяется на нескольких уровнях:
@@ -274,11 +364,29 @@ service_price_gt_zero
 
 Так корректность данных не зависит только от того, через какой слой приложения была создана запись.
 
-Для бронирований также проверяется:
+### Бронирования
+
+Для бронирований проверяется:
 
 - дата должна находиться в будущем;
 - пользователь не может забронировать собственную услугу;
-- провайдер не может создавать бронирования как клиент.
+- провайдер не может создавать бронирования как клиент;
+- нельзя создать второе активное бронирование той же услуги на тот же `booking_date`.
+
+Уникальность активного слота дополнительно защищена conditional database constraint:
+
+```text
+unique_active_booking_slot
+```
+
+Constraint применяется только к активным статусам:
+
+```text
+pending
+confirmed
+```
+
+Таким образом `canceled` бронирование не блокирует повторное использование времени.
 
 ## Оптимизация запросов
 
@@ -307,7 +415,7 @@ service.provider
 
 Это уменьшает количество дополнительных SQL-запросов при сериализации данных.
 
-В тестах также есть проверка количества запросов для списка услуг, чтобы защититься от появления N+1 problem при дальнейших изменениях проекта.
+В тестах есть проверка максимального количества запросов для списка услуг, чтобы защититься от N+1 regression при дальнейших изменениях проекта.
 
 ## Фильтрация, поиск и сортировка
 
@@ -396,7 +504,7 @@ GET /api/services/?ordering=-created_at
 ### Database
 
 - PostgreSQL 16
-- psycopg2
+- psycopg2 / psycopg2-binary
 
 ### Testing and code quality
 
@@ -456,9 +564,62 @@ requirements/
 requirements.txt
 ```
 
-подключает development-набор для локальной разработки и development Docker environment.
+подключает development-набор для локальной установки зависимостей.
 
-## Запуск через Docker
+## Docker dependency profiles
+
+Dockerfile поддерживает выбор набора зависимостей через build argument:
+
+```text
+REQUIREMENTS_FILE
+```
+
+По умолчанию Docker image собирается с:
+
+```text
+requirements/production.txt
+```
+
+То есть обычный production build содержит:
+
+```text
+base dependencies
++
+Gunicorn
+```
+
+При локальном запуске `docker-compose.yml` переопределяет build argument на:
+
+```text
+requirements/dev.txt
+```
+
+Поэтому development container дополнительно содержит:
+
+```text
+pytest
+pytest-django
+Ruff
+pre-commit
+```
+
+Получается:
+
+```text
+docker build .
+        ↓
+production dependencies
+        ↓
+Gunicorn
+
+docker compose build
+        ↓
+development dependencies
+        ↓
+pytest + Ruff + pre-commit
+```
+
+## Запуск через Docker Compose
 
 ### 1. Клонирование репозитория
 
@@ -519,6 +680,28 @@ docker compose exec web python manage.py createsuperuser
 http://localhost:8000/
 ```
 
+## Production Docker image
+
+Dockerfile по умолчанию устанавливает production dependencies и содержит команду запуска через Gunicorn.
+
+Сборка production image:
+
+```bash
+docker build -t task-master-prod .
+```
+
+Проверка наличия Gunicorn:
+
+```bash
+docker run --rm task-master-prod gunicorn --version
+```
+
+Docker Compose используется как development environment и переопределяет production-команду на:
+
+```text
+python manage.py runserver 0.0.0.0:8000
+```
+
 ## Переменные окружения
 
 Пример находится в:
@@ -548,6 +731,47 @@ DB_HOST=db
 
 Обязательные параметры приложения и базы данных проверяются при старте. Если необходимая переменная окружения отсутствует, приложение завершается с явной ошибкой конфигурации.
 
+## Защита секретов при Docker build
+
+`.env` используется только как локальный runtime configuration и не должен попадать в Git или Docker image.
+
+Для Git используется:
+
+```text
+.gitignore
+```
+
+Для Docker build context используется:
+
+```text
+.dockerignore
+```
+
+Из Docker build context исключаются в том числе:
+
+```text
+.env
+.env.*
+.venv/
+.git/
+.pytest_cache/
+.ruff_cache/
+```
+
+Это предотвращает случайное копирование локального `.env` при:
+
+```dockerfile
+COPY . .
+```
+
+Для передачи проекта или создания архива рекомендуется использовать:
+
+```bash
+git archive --format=zip --output=task_master.zip HEAD
+```
+
+Так в архив попадают только отслеживаемые Git файлы, без `.env`, `.venv` и `.git`.
+
 ## API-документация
 
 Swagger UI:
@@ -560,6 +784,12 @@ OpenAPI schema:
 
 ```text
 http://localhost:8000/api/schema/
+```
+
+Проверка схемы через drf-spectacular:
+
+```bash
+docker compose exec web python manage.py spectacular --file /tmp/schema.yml --validate
 ```
 
 ## Тестирование
@@ -588,6 +818,7 @@ docker compose exec web pytest -v
 - permissions;
 - работу категорий;
 - CRUD услуг;
+- публичность и приватность данных провайдера;
 - фильтрацию;
 - поиск;
 - сортировку;
@@ -597,7 +828,10 @@ docker compose exec web pytest -v
 - переходы статусов;
 - бизнес-логику booking service layer;
 - model validation;
-- database constraints.
+- database constraints;
+- запрет конфликтующих активных бронирований;
+- освобождение временного слота после отмены;
+- row-level locking и конкурентные PostgreSQL-транзакции.
 
 ## Code quality
 
@@ -663,6 +897,7 @@ ruff format --check .
 pre-commit run --all-files
 docker compose exec web python manage.py check
 docker compose exec web python manage.py makemigrations --check --dry-run
+docker compose exec web python manage.py spectacular --file /tmp/schema.yml --validate
 docker compose exec web pytest -q
 ```
 
@@ -694,23 +929,29 @@ Dockerfile использует multi-stage build.
 На первом этапе:
 
 - создаётся отдельное virtual environment;
-- устанавливаются Python-зависимости.
+- выбирается requirements profile;
+- по умолчанию устанавливаются production-зависимости.
 
 На втором этапе:
 
 - используется новый минимальный Python image;
 - копируется готовое virtual environment;
-- исходный код запускается от непривилегированного пользователя `appuser`.
+- копируется исходный код;
+- приложение запускается от непривилегированного пользователя `appuser`.
 
-Dockerfile содержит production-команду запуска через Gunicorn.
+Production-команда:
 
-При запуске через `docker-compose.yml` она переопределяется development-командой:
+```text
+Gunicorn
+```
+
+Development-команда через Docker Compose:
 
 ```text
 python manage.py runserver 0.0.0.0:8000
 ```
 
-Это позволяет использовать один Dockerfile как основу для development и production-oriented runtime.
+Таким образом один Dockerfile используется как основа для production image и development Compose environment.
 
 ## Структура проекта
 
@@ -726,6 +967,7 @@ task_master/
 │   ├── migrations/
 │   ├── tests/
 │   │   ├── conftest.py
+│   │   ├── test_booking_concurrency.py
 │   │   ├── test_booking_services.py
 │   │   ├── test_bookings.py
 │   │   ├── test_categories.py
@@ -770,25 +1012,49 @@ task_master/
 - business logic переходов бронирования вынесена из ViewSet в service layer;
 - критические изменения состояния выполняются внутри database transaction;
 - `select_for_update()` защищает booking transitions от race conditions;
+- row locking проверяется отдельным PostgreSQL concurrency integration test;
 - queryset ограничивает видимость чужих бронирований;
 - object-level permissions защищают изменение чужих услуг;
 - read/write serializers разделены для разных API-сценариев;
+- публичный serializer провайдера отделён от serializer профиля;
 - API отклоняет недопустимые поля профиля явным `400 Bad Request`;
-- `CheckConstraint` защищает целостность цены услуги на уровне базы данных;
+- `CheckConstraint` защищает положительную цену услуги на уровне базы данных;
+- conditional `UniqueConstraint` защищает активный временной слот от двойного бронирования;
+- serializer validation даёт понятную ошибку обычного конфликта;
+- database constraint остаётся окончательной гарантией при конкурентных запросах;
 - `select_related()` уменьшает количество SQL-запросов;
 - query-count test защищает список услуг от N+1 regression;
 - зависимости разделены на runtime, development и production;
+- Docker production build устанавливает Gunicorn независимо от development requirements;
+- `.dockerignore` исключает локальные секреты из build context;
 - Ruff и pre-commit поддерживают единый стиль кода;
 - GitHub Actions автоматически проверяет код перед merge.
+
+## Известные ограничения
+
+Текущая модель бронирования использует один `booking_date`.
+
+Поэтому проект умеет предотвращать двойное активное бронирование одного точного времени, но пока не моделирует:
+
+- продолжительность услуги;
+- временные интервалы;
+- расписание провайдера;
+- рабочие часы;
+- пересекающиеся интервалы;
+- несколько параллельных мест или capacity.
+
+Это осознанное ограничение текущей версии API.
 
 ## Планы развития
 
 Возможные следующие этапы развития проекта:
 
-- ограничения пересекающихся бронирований по времени;
+- добавить продолжительность услуг;
+- реализовать полноценные time slots и проверку пересечения интервалов;
+- добавить расписание и рабочие часы провайдеров;
 - уведомления о смене статуса бронирования;
 - фоновые задачи через Celery;
-- Redis для кеширования и background infrastructure;
+- Redis для caching и background infrastructure;
 - отдельные Django settings для development и production;
 - production deployment;
-- расширение API monitoring и logging.
+- централизованные logging и monitoring.
