@@ -66,5 +66,8 @@ jobs:
       - name: Apply migrations
         run: python manage.py migrate
 
+      - name: Validate OpenAPI schema
+        run: python manage.py spectacular --file /tmp/schema.yml --validate
+
       - name: Run tests
         run: pytest
