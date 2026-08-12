@@ -138,6 +138,7 @@ class BookingSerializer(serializers.ModelSerializer):
     def validate(self, attrs):
         request = self.context.get("request")
         service = attrs.get("service")
+        booking_date = attrs.get("booking_date")
 
         if request is None:
             return attrs
@@ -153,5 +154,20 @@ class BookingSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(
                 "Провайдер не может создавать бронирования."
             )
+
+        if service and booking_date:
+            booking_exists = Booking.objects.filter(
+                service=service,
+                booking_date=booking_date,
+                status__in=[
+                    Booking.Status.PENDING,
+                    Booking.Status.CONFIRMED,
+                ],
+            ).exists()
+
+            if booking_exists:
+                raise serializers.ValidationError(
+                    {"booking_date": ("Это время уже занято для выбранной услуги.")}
+                )
 
         return attrs

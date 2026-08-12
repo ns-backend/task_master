@@ -120,7 +120,7 @@ def another_client_booking(
     return Booking.objects.create(
         client=another_client,
         service=service,
-        booking_date=future_booking_date,
+        booking_date=future_booking_date + timedelta(hours=1),
     )
 
 

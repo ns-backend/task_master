@@ -86,6 +86,15 @@ class Booking(models.Model):
         verbose_name = "Бронирование"
         verbose_name_plural = "Бронирования"
         ordering = ["-created_at"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["service", "booking_date"],
+                condition=models.Q(
+                    status__in=["pending", "confirmed"],
+                ),
+                name="unique_active_booking_slot",
+            ),
+        ]
 
     def clean(self):
         if self.booking_date < timezone.now():
